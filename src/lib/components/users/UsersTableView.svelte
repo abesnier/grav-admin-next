@@ -6,6 +6,7 @@
 	import type { UserInfo, UserColumn, UserRowAction } from '$lib/api/endpoints/users';
 	import type { FlexDetailConfig } from '$lib/api/endpoints/flexObjects';
 	import { resolveAvatarUrl } from '$lib/utils/avatar';
+	import { auth } from '$lib/stores/auth.svelte';
 	import { Pencil, Trash2, Shield, ShieldCheck, ArrowUp, ArrowDown, Loader2, ChevronDown, ChevronRight } from 'lucide-svelte';
 	import { flattenAccess, isSuperAdmin, hasBackendAccess } from '$lib/utils/user-access';
 	import FlexDetailTable from '$lib/components/flex-objects/FlexDetailTable.svelte';
@@ -182,7 +183,7 @@
 					<td class="px-4 py-2 text-muted-foreground">{user.email ?? '—'}</td>
 					<td class="px-4 py-2">{user.fullname ?? '—'}</td>
 					<td class="px-4 py-2">
-						{#if onToggleState && canEdit}
+						{#if onToggleState && canEdit && user.username !== auth.username}
 							<button
 								type="button"
 								class="rounded-full px-2.5 py-0.5 text-[0.625rem] font-medium transition-colors

@@ -29,6 +29,7 @@
 	import { getGroups } from '$lib/api/endpoints/groups';
 	import { prefs } from '$lib/stores/preferences.svelte';
 	import { canWrite } from '$lib/utils/permissions';
+	import { auth } from '$lib/stores/auth.svelte';
 	import {
 		flattenAccess,
 		isSuperAdmin,
@@ -533,8 +534,9 @@
 								<p class="truncate text-xs text-muted-foreground">{user.email ?? user.username}</p>
 							</div>
 
-							<!-- State toggle -->
-							{#if canEditUsers}
+							<!-- State toggle. Not on your own row: the API refuses to let you
+							     disable yourself, so it shows as a plain badge there. -->
+							{#if canEditUsers && user.username !== auth.username}
 								<button
 									type="button"
 									class="shrink-0 rounded-full px-2.5 py-0.5 text-[0.625rem] font-medium transition-colors
@@ -657,6 +659,7 @@
 							</div>
 							<div class="flex items-center gap-2">
 								{#if canEditUsers}
+									{#if selectedUser.username !== auth.username}
 									<button
 										type="button"
 										class="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border px-3 text-xs font-medium transition-colors disabled:opacity-50
@@ -675,6 +678,7 @@
 										{/if}
 										{selectedUser.state === 'enabled' ? i18n.t('ADMIN_NEXT.USERS_TABLE.ENABLED') : i18n.t('ADMIN_NEXT.USERS_TABLE.DISABLED')}
 									</button>
+									{/if}
 									<button
 										type="button"
 										class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"

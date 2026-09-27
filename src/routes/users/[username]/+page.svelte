@@ -103,6 +103,9 @@
 			.filter((f) => {
 				if (SUPPRESSED_TYPES.has(f.type)) return false;
 				if (SUPPRESSED_NAMES.has(f.name)) return false;
+				// No Status select on your own account: the API refuses to let you
+				// disable yourself (api#49). The unchanged value still goes back on save.
+				if (isSelf && f.name === 'state') return false;
 				return true;
 			})
 			.map((f) => {
