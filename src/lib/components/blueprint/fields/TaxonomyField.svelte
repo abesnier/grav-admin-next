@@ -69,7 +69,10 @@
 			type: 'selectize',
 			label: type.charAt(0).toUpperCase() + type.slice(1),
 			placeholder: `Add ${type}...`,
-			options: (taxonomyMap[type] ?? []).map((v) => ({ value: v, label: v })),
+			// Alphabetical, so a site's existing tags are easy to scan (admin2#180).
+			options: [...(taxonomyMap[type] ?? [])]
+				.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+				.map((v) => ({ value: v, label: v })),
 			validate: { type: 'array' }
 		};
 	}

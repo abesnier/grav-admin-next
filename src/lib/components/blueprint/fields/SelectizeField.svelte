@@ -102,10 +102,14 @@
 		if (inputValue.length > 0) {
 			const needle = inputValue.toLowerCase();
 			// Match on the visible label as well as the value, since users type
-			// the readable name rather than the underlying key.
-			return available.filter((opt) =>
+			// the readable name rather than the underlying key. Options that
+			// start with what was typed come first, so Tab takes the obvious one.
+			const starts = (opt: string) =>
+				opt.toLowerCase().startsWith(needle) || labelFor(opt).toLowerCase().startsWith(needle);
+			const matches = available.filter((opt) =>
 				opt.toLowerCase().includes(needle) || labelFor(opt).toLowerCase().includes(needle)
 			);
+			return [...matches.filter(starts), ...matches.filter((opt) => !starts(opt))];
 		}
 		return available;
 	});
@@ -121,16 +125,27 @@
 		onchange(newTags);
 	}
 
-	function addTag(tag: string) {
-		const trimmed = tag.trim();
-		if (!trimmed || tags.includes(trimmed)) return;
-		emitChange([...tags, trimmed]);
+	function addTags(newTags: string[]) {
+		const next = [...tags];
+		for (const tag of newTags) {
+			const trimmed = tag.trim();
+			if (trimmed && !next.includes(trimmed)) next.push(trimmed);
+		}
+		if (next.length > tags.length) emitChange(next);
+		// Clear the box even when the tag was already there, and clear the
+		// element itself: a value the browser put back without an input event
+		// (an input method committing its text after Enter) left the typed word
+		// on screen while the state was empty, so Backspace took the last tag
+		// instead (getgrav/grav-plugin-admin2#180).
 		inputValue = '';
+		if (inputEl) inputEl.value = '';
 		highlightedIndex = -1;
 		selectedTagIndex = -1;
 		// Keep suggestions open if there are predefined options
 		showSuggestions = predefinedOptions.length > 0;
 	}
+
+	const addTag = (tag: string) => addTags([tag]);
 
 	function removeTag(index: number) {
 		emitChange(tags.filter((_, i) => i !== index));
@@ -139,6 +154,10 @@
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
+		// A key that confirms an input method's word (accented letters, dead
+		// keys, Android keyboards) belongs to the input method, not to us.
+		if (e.isComposing || e.keyCode === 229) return;
+
 		// If a tag is selected via arrow keys
 		if (selectedTagIndex >= 0) {
 			if (e.key === 'Backspace' || e.key === 'Delete') {
@@ -174,23 +193,30 @@
 			return;
 		}
 
+		// Read the box itself, not the state: if they ever disagree, what the
+		// user can see is what Backspace should act on.
+		const typed = inputEl?.value ?? inputValue;
+
 		if (e.key === 'Enter' || e.key === 'Tab' || e.key === ',') {
 			if (highlightedIndex >= 0 && highlightedIndex < suggestions.length) {
 				e.preventDefault();
 				addTag(suggestions[highlightedIndex]);
-			} else if (inputValue.trim()) {
+			} else if (e.key === 'Tab' && typed.trim() && suggestions.length > 0) {
+				// Tab completes to the best match, as classic admin did; Enter
+				// and comma keep exactly what was typed.
 				e.preventDefault();
-				addTag(inputValue);
-			} else if (e.key === 'Enter' && suggestions.length > 0 && !inputValue) {
-				// Don't prevent tab default when no input
+				addTag(suggestions[0]);
+			} else if (typed.trim()) {
+				e.preventDefault();
+				addTag(typed);
 			}
 		} else if (e.key === 'Backspace') {
-			if (!inputValue && tags.length > 0) {
+			if (!typed && tags.length > 0) {
 				e.preventDefault();
 				selectedTagIndex = tags.length - 1;
 			}
 		} else if (e.key === 'ArrowLeft') {
-			if (!inputValue && tags.length > 0) {
+			if (!typed && tags.length > 0) {
 				e.preventDefault();
 				selectedTagIndex = tags.length - 1;
 			}
@@ -210,7 +236,20 @@
 	}
 
 	function handleInput(e: Event) {
-		inputValue = (e.target as HTMLInputElement).value;
+		const value = (e.target as HTMLInputElement).value;
+		// A comma that reached the box (a pasted list, or a keyboard whose
+		// keydown carries no key) still ends a tag; the part after the last
+		// comma stays in the box.
+		if (value.includes(',')) {
+			const parts = value.split(',');
+			const rest = (parts.pop() ?? '').trimStart();
+			addTags(parts);
+			inputValue = rest;
+			if (inputEl) inputEl.value = rest;
+			showSuggestions = true;
+			return;
+		}
+		inputValue = value;
 		showSuggestions = true;
 		highlightedIndex = -1;
 		selectedTagIndex = -1;
@@ -223,8 +262,9 @@
 
 	function handleBlur() {
 		setTimeout(() => {
-			if (inputValue.trim()) {
-				addTag(inputValue);
+			const typed = inputEl?.value ?? inputValue;
+			if (typed.trim()) {
+				addTag(typed);
 			}
 			showSuggestions = false;
 			highlightedIndex = -1;
