@@ -1,9 +1,10 @@
 import tailwindcss from '@tailwindcss/vite';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig, type Plugin } from 'vite';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 /**
  * Lucide icons that plugins name at runtime ("shield-check", "ShieldCheck"),
@@ -81,8 +82,85 @@ function lucideIconBuckets(): Plugin {
 	};
 }
 
+/**
+ * The lucide icons our own source names (`import { X } from 'lucide-svelte'`),
+ * as their file names in lucide-svelte/dist/icons. Icons reached only through
+ * the lazy `virtual:lucide-icons/*` buckets are not in this set.
+ */
+function sourceNamedIcons(): Set<string> {
+	const dist = dirname(createRequire(import.meta.url).resolve('lucide-svelte'));
+	const files = new Map<string, string>();
+	const icons = readFileSync(resolve(dist, 'icons/index.js'), 'utf8');
+	for (const m of icons.matchAll(/default as (\w+)\s*\}\s*from\s*'\.\/([\w-]+)\.svelte'/g)) {
+		files.set(m[1], m[2]);
+	}
+	const aliases = readFileSync(resolve(dist, 'aliases/aliases.js'), 'utf8');
+	for (const m of aliases.matchAll(/default as (\w+)\s*\}\s*from\s*'\.\.\/icons\/([\w-]+)\.js'/g)) {
+		const stub = readFileSync(resolve(dist, `icons/${m[2]}.js`), 'utf8');
+		const file = stub.match(/\.\/([\w-]+)\.svelte/)?.[1];
+		if (file) files.set(m[1], file);
+	}
+
+	const named = new Set<string>();
+	const walk = (dir: string) => {
+		for (const entry of readdirSync(dir, { withFileTypes: true })) {
+			const path = resolve(dir, entry.name);
+			if (entry.isDirectory()) walk(path);
+			else if (/\.(ts|js|svelte)$/.test(entry.name)) {
+				const src = readFileSync(path, 'utf8');
+				for (const m of src.matchAll(/import\s*\{([^}]*)\}\s*from\s*['"]lucide-svelte['"]/g)) {
+					for (const spec of m[1].split(',')) {
+						const file = files.get(spec.trim().split(/\s+as\s+/)[0]);
+						if (file) named.add(file);
+					}
+				}
+			}
+		}
+	};
+	walk(resolve(dirname(fileURLToPath(import.meta.url)), 'src'));
+	return named;
+}
+
+/**
+ * Fewer, larger chunks on first load (admin2#181). Left alone, Rollup gives
+ * every module shared between the shell and a lazy route its own chunk, so the
+ * shell modulepreloaded ~75 files, 50 of them under 1 KB. Hosts whose proxy
+ * rate-limits bursts turn one of those into a 503/429 and the admin fails to
+ * boot. Two groups cover most of them without moving lazy code into the first
+ * load: the Svelte runtime, which the shell needs almost all of anyway, and
+ * the icons our own components import by name.
+ *
+ * Not `output.experimentalMinChunkSize`: it merges small chunks into whichever
+ * chunk loads "under similar conditions", which pulled the Font Awesome map
+ * and CodeMirror modes into the shell (+42% gzip on first load).
+ */
+function clientChunkGroups(): Plugin {
+	let ssr = false;
+	let icons: Set<string> | null = null;
+	const group = (id: string) => {
+		if (/[\\/]node_modules[\\/]svelte[\\/]src[\\/]/.test(id)) return 'svelte';
+		const icon = id.match(/[\\/]node_modules[\\/]lucide-svelte[\\/]dist[\\/]icons[\\/]([\w-]+)\.svelte$/);
+		if (icon) {
+			icons ??= sourceNamedIcons();
+			if (icons.has(icon[1])) return 'icons';
+		}
+		return undefined;
+	};
+	return {
+		name: 'grav-client-chunk-groups',
+		apply: 'build',
+		configResolved(config) {
+			ssr = !!config.build.ssr;
+		},
+		outputOptions(options) {
+			// Client bundle only; the server build just prerenders the fallback shell.
+			return ssr ? null : { ...options, manualChunks: group };
+		}
+	};
+}
+
 export default defineConfig({
-	plugins: [tailwindcss(), lucideIconBuckets(), sveltekit()],
+	plugins: [tailwindcss(), lucideIconBuckets(), clientChunkGroups(), sveltekit()],
 	server: {
 		proxy: {
 			// Proxy all Grav requests (API + media files) during development

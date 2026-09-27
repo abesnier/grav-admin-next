@@ -397,6 +397,13 @@
 		window.__GRAV_MEDIA_PICKER = () => mediaPicker.open();
 	});
 
+	// The app has mounted: the boot-chunk recovery in app.html stops reloading
+	// from here on, and its retry count starts over for this tab (admin2#181).
+	$effect(() => {
+		window.__GRAV_BOOTED__ = true;
+		try { sessionStorage.removeItem('grav-admin2-boot-retry'); } catch { /* storage blocked */ }
+	});
+
 	// Check for a new admin build every 60s while the tab is visible, and on
 	// coming back to a tab that missed a check. Kit's built-in timer
 	// (`version.pollInterval`) would keep fetching in hidden tabs, so it is

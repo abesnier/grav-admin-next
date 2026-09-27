@@ -37,6 +37,8 @@ declare global {
 		 * or null if cancelled. Used by editor-pro's image insert.
 		 */
 		__GRAV_MEDIA_PICKER?: () => Promise<{ url: string; display: string; alt: string } | null>;
+		/** Set once the root layout mounts; the boot-chunk recovery in app.html stops reloading. */
+		__GRAV_BOOTED__?: boolean;
 		__GRAV_CONTENT_LANG: string;
 		__GRAV_PAGE_LOADING: Record<string, Promise<void> | undefined>;
 		__GRAV_FIELD_LOADING: Record<string, Promise<void> | undefined>;
