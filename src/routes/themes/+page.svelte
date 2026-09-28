@@ -262,7 +262,7 @@
 		const ok = await dialogs.confirm({
 			title: i18n.t('ADMIN_NEXT.THEMES.UPDATE_ALL_CONFIRM_TITLE'),
 			message: i18n.t('ADMIN_NEXT.THEMES.UPDATE_ALL_CONFIRM_MESSAGE', { n: updatable.length }),
-			items: updatable.map((t) => `${t.name} → v${t.available_version}`),
+			items: updatable.map((t) => `${t.name} : v${t.version} → v${t.available_version}`),
 			confirmLabel: i18n.t('ADMIN_NEXT.THEMES.UPDATE_ALL'),
 		});
 		if (!ok) return;
