@@ -150,8 +150,8 @@ export interface UpdatesData {
 		updatable: boolean;
 		is_symlink?: boolean;
 	};
-	plugins: { slug: string; name: string; available_version: string; updatable: boolean }[];
-	themes: { slug: string; name: string; available_version: string; updatable: boolean }[];
+	plugins: { slug: string; name: string; version: string; available_version: string; updatable: boolean }[];
+	themes: { slug: string; name: string; version: string; available_version: string; updatable: boolean }[];
 	total: number;
 }
 
