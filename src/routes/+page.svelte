@@ -278,7 +278,7 @@
 		const ok = await dialogs.confirm({
 			title: i18n.t('ADMIN_NEXT.SYSTEM_HEALTH_WIDGET.UPDATE_ALL_CONFIRM_TITLE'),
 			message: i18n.t('ADMIN_NEXT.SYSTEM_HEALTH_WIDGET.UPDATE_ALL_CONFIRM_MESSAGE', { n }),
-			items: updatable.map(p => `${p.name} → v${p.available_version}`),
+			items: updatable.map(p => `${p.name} : v${p.version} → v${p.available_version}`),
 			confirmLabel: i18n.t('ADMIN_NEXT.SYSTEM_HEALTH_WIDGET.UPDATE_ALL'),
 		});
 		if (!ok) return;
